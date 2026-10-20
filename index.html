@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TWSE 連線測試</title>
+</head>
+<body>
+  <h1>證交所資料連線測試</h1>
+  <button id="test">測試連線</button>
+  <pre id="result">尚未測試</pre>
+
+  <script>
+    document.getElementById("test").onclick = async () => {
+      const result = document.getElementById("result");
+      result.textContent = "連線中...";
+      try {
+        const response = await fetch(
+          "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+        );
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const data = await response.json();
+        result.textContent =
+          "連線成功！\n取得 " + data.length +
+          " 筆資料。\n\n" + JSON.stringify(data.slice(0, 3), null, 2);
+      } catch (error) {
+        result.textContent = "連線失敗：" + error.message;
+      }
+    };
+  </script>
+</body>
+</html>
