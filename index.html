@@ -68,20 +68,21 @@ details{margin-top:6px}summary{color:var(--ac);font-size:13px}
 
 <section id="q"><div class="card"><h2>行情查詢</h2><input id="s" placeholder="輸入代號或名稱(例:2330、台泥)"></div><div id="res"></div></section>
 <section id="d"><div class="card"><h2>資料狀態</h2><div id="st" class="mu">載入中…</div></div>
-<div class="card mu">限制:無盤中行情,不能做當沖訊號。歷史日線還在累積,技術面與回測目前不可用。ETF、權證、金融保險業財報未納入。上市個股法人買賣超沒有官方來源。EPS 欄位疑為年度累計值。</div></section>
+<div class="card mu">限制:無盤中行情,不能做當沖訊號。歷史日線還在累積,技術面與回測目前不可用。上市 ETF 可查詢與試算(不進前 20 名);上櫃 ETF、權證、金融保險業財報未納入。上市個股法人買賣超沒有官方來源。EPS 欄位疑為年度累計值。</div></section>
 </main>
 <nav><button class="on" data-t="c"><b>🗻</b>分析</button><button data-t="r"><b>🌸</b>前20名</button><button data-t="q"><b>🏮</b>行情</button><button data-t="d"><b>📜</b>資料</button></nav>
 <script src="costs.js"></script>
 <script>
 const $=id=>document.getElementById(id),N=x=>{const v=parseFloat(String(x==null?'':x).replace(/,/g,''));return isNaN(v)?null:v};
 const f=(x,d=0)=>x==null?'資料不足':x.toLocaleString('zh-TW',{maximumFractionDigits:d,minimumFractionDigits:d});
-const FILES=['twse_price','tpex_price','twse_valuation','tpex_valuation','twse_revenue','tpex_revenue','twse_income','tpex_income','twse_punish','twse_notice','tpex_disposal','tpex_warning'];
+const FILES=['twse_price','tpex_price','twse_etf_price','twse_fund_list','twse_valuation','tpex_valuation','twse_revenue','tpex_revenue','twse_income','tpex_income','twse_punish','twse_notice','tpex_disposal','tpex_warning'];
 const D={},S={};
 async function load(n){try{const r=await fetch('data/latest/'+n+'.json',{cache:'no-store'});if(!r.ok)throw 0;D[n]=await r.json()}catch(e){D[n]=null}}
 const get=(c,mk,nm)=>S[c]||(S[c]={code:c,name:nm,mk:mk,al:[]});
 function build(){
- for(const [n,mk,ck,nk,pk,vk] of [['twse_price','上市','Code','Name','ClosingPrice','TradeVolume'],['tpex_price','上櫃','SecuritiesCompanyCode','CompanyName','Close','TradingShares']])
-  for(const r of (D[n]?D[n].records:[])){const s=get(r[ck],mk,r[nk]);s.close=N(r[pk]);s.chg=N(r.Change);s.vol=N(r[vk]);s.pd=D[n].meta.data_date}
+ for(const [n,mk,ck,nk,pk,vk] of [['twse_price','上市','Code','Name','ClosingPrice','TradeVolume'],['tpex_price','上櫃','SecuritiesCompanyCode','CompanyName','Close','TradingShares'],['twse_etf_price','上市ETF','Code','Name','ClosingPrice','TradeVolume']])
+  for(const r of (D[n]?D[n].records:[])){const s=get(r[ck],mk,r[nk]);if(mk=='上市ETF')s.etf=1;s.close=N(r[pk]);s.chg=N(r.Change);s.vol=N(r[vk]);s.pd=D[n].meta.data_date}
+ for(const r of (D.twse_fund_list?D.twse_fund_list.records:[])){const s=S[r['基金代號']];if(s){s.ftype=r['基金類型'];s.idx=r['標的指數/追蹤指數名稱']}}
  for(const [n,ck,a,b,c] of [['twse_valuation','Code','PEratio','PBratio','DividendYield'],['tpex_valuation','SecuritiesCompanyCode','PriceEarningRatio','PriceBookRatio','YieldRatio']])
   for(const r of (D[n]?D[n].records:[])){const s=S[r[ck]];if(s){s.pe=N(r[a]);s.pb=N(r[b]);s.dy=N(r[c])}}
  for(const n of ['twse_revenue','tpex_revenue'])for(const r of (D[n]?D[n].records:[])){const s=S[r['公司代號']];if(s){s.ry=N(r['營業收入-去年同月增減(%)']);s.rm=r['資料年月']}}
@@ -94,12 +95,12 @@ function build(){
 const STOP={'當沖':1.5,'短期(1~5日)':3,'短線波段(1~4週)':6,'中期(1~6月)':10,'長期(6月~3年)':15,'長期投資(3年以上)':20};
 const DAYS={'當沖':0,'短期(1~5日)':7,'短線波段(1~4週)':28,'中期(1~6月)':182,'長期(6月~3年)':1095,'長期投資(3年以上)':null};
 const PF={'0.5':0.8,'1':1,'2':1.25};
-function tick(p){return p<10?.01:p<50?.05:p<100?.1:p<500?.5:p<1000?1:5}
-const dn=(p)=>{const t=tick(p);return Math.floor(p/t+1e-9)*t},up=(p)=>{const t=tick(p);return Math.ceil(p/t-1e-9)*t};
-function cfg(){const h=$('hold').value,dt=h=='當沖';return{cap:N($('cap').value),inv:N($('inv').value),rk:N($('risk').value),pc:N($('pct').value)||0,h:h,pf:$('pref').value,mode:$('mode').value,
- p:{rate:N($('fr').value)/100,disc:N($('ds').value)/10,minFee:N($('mf').value),tax:(dt?0.15:N($('tx').value))/100}}}
+function tick(p,e){return e?(p<50?.01:.05):p<10?.01:p<50?.05:p<100?.1:p<500?.5:p<1000?1:5}
+const dn=(p,e)=>{const t=tick(p,e);return +(Math.floor(p/t+1e-9)*t).toFixed(2)},up=(p,e)=>{const t=tick(p,e);return +(Math.ceil(p/t-1e-9)*t).toFixed(2)};
+function cfg(etf){const h=$('hold').value,dt=h=='當沖';return{etf:!!etf,cap:N($('cap').value),inv:N($('inv').value),rk:N($('risk').value),pc:N($('pct').value)||0,h:h,pf:$('pref').value,mode:$('mode').value,
+ p:{rate:N($('fr').value)/100,disc:N($('ds').value)/10,minFee:N($('mf').value),tax:(etf?0.1:(dt?0.15:N($('tx').value)))/100}}}
 function plan(buy,c){
- const stop=dn(buy*(1-STOP[c.h]*PF[c.pf]/100)),tgt=up(buy+2*(buy-stop)),ml=c.cap*c.rk/100;
+ const stop=dn(buy*(1-STOP[c.h]*PF[c.pf]/100),c.etf),tgt=up(buy+2*(buy-stop),c.etf),ml=c.cap*c.rk/100;
  const base={invest:c.inv,capital:c.cap,maxLoss:ml,maxPct:c.pc,buy,stop};
  let sh=0,unit=1000,over=false;
  if(c.mode!='1')sh=Costs.size({...base,unit:1000},c.p);
@@ -120,8 +121,9 @@ function result(buy,c,s){
  <div class="mu">出場規則:跌到停損價就出;漲到目標價就出;到了檢視日還沒觸發,重新評估。停損距離 = 買價 × ${STOP[c.h]}% × 風險係數 ${PF[c.pf]}(預設規則,我的假設,並非由資料算出)。目標價只是依 1:2 計算的價位,<b>不代表會漲到那裡</b>;價格已依升降單位調整。</div></div>
  <div class="card"><h2>若照此進場,可能結果</h2><table>${row('跌到停損:淨損益',f(ls.pnl),'bad')}${row('跌到停損:報酬率',f(ls.ret*100,2)+'%','bad')}${row('漲到目標:淨損益',f(tg.pnl),'ok')}${row('漲到目標:報酬率',f(tg.ret*100,2)+'%','ok')}${row('預估報酬區間','無法可靠估算')}</table>
  <div class="mu">損益已含買賣手續費與證交稅。報酬「區間」需要歷史統計驗證,目前沒有,所以不給。買入手續費 ${f(b.bf)} 元;賣出手續費+證交稅(目標價時)${f(tg.sf+tg.st)} 元。</div></div>`;
+ if(c.etf)h+='<div class="card mu">ETF 說明:證交稅預設 0.1%、升降單位以 50 元為界(0.01/0.05),都是假設值,請自行核對。債券型等 ETF 稅制可能不同。ETF 沒有營收與 EPS,前 20 名不含 ETF。停損距離規則與一般股票相同,ETF 波動通常較小,停損可能偏寬。</div>';
  return h}
-$('go').onclick=()=>{const c=cfg(),s=resolve();let buy=N($('buy').value);if(buy==null&&s)buy=s.close;
+$('go').onclick=()=>{const s=resolve(),c=cfg(s&&s.etf);let buy=N($('buy').value);if(buy==null&&s)buy=s.close;
  if(buy==null||buy<=0||[c.cap,c.inv,c.rk].some(v=>v==null||v<=0))return $('out').innerHTML='<div class="card bad">請填寫總資金、投入金額、最大損失%,並輸入有效的股票(代號或名稱)或買進價。若輸入名稱沒反應,請點下方出現的選項。</div>';
  if(c.inv>c.cap)return $('out').innerHTML='<div class="card bad">投入金額不能超過總資金。</div>';
  $('out').innerHTML=result(buy,c,s)};
@@ -132,7 +134,7 @@ function score(s){let have=0;if(s.pe!=null)have++;if(s.pb!=null)have++;if(s.eps!
 $('rk').onclick=()=>{const c=cfg();
  if([c.cap,c.inv,c.rk].some(v=>v==null||v<=0))return $('rout').innerHTML='<div class="card bad">請先在「分析」頁填好投資條件。</div>';
  if(!['中期(1~6月)','長期(6月~3年)','長期投資(3年以上)'].includes(c.h))return $('rout').innerHTML=`<div class="card warn"><b class="w">「${c.h}」目前無法排名</b><div class="mu">這類排名需要價格走勢、動能與盤中資料。歷史日線才剛開始累積(約需 35 個交易日以上才算得出 MACD 等指標),盤中資料則沒有合法的免費來源。為了不給你假排名,先不提供。你可以改選「中期」以上,或到「分析」頁看單一股票。</div></div>`;
- const all=Object.values(S).filter(s=>s.close>0),ex={al:0,eps:0,few:0,buy:0};const L=[];
+ const all=Object.values(S).filter(s=>s.close>0&&!s.etf),ex={al:0,eps:0,few:0,buy:0};const L=[];
  for(const s of all){if(s.al.length){ex.al++;continue}if(s.eps!=null&&s.eps<=0){ex.eps++;continue}const sc=score(s);if(sc.have<3){ex.few++;continue}if(s.close>c.inv){ex.buy++;continue}L.push({s,sc})}
  L.sort((a,b)=>b.sc.t-a.sc.t);const top=L.slice(0,20);
  let h=`<div class="card mu">範圍:上市櫃一般股票 ${all.length} 檔有收盤價(收盤資料日 ${(all[0]||{}).pd||'?'})。排除:處置/注意股 ${ex.al}、累計EPS≤0 ${ex.eps}、資料欄位不足 ${ex.few}、單股價格高於投入金額 ${ex.buy}。入選候選 ${L.length} 檔,顯示前 ${top.length} 檔。<br>評分(滿分100):本益比15(越低越高,≥30為0)+淨值比10(≤1滿分,≥4為0)+累計EPS為正20+營收年增25(0~30%線性)+殖利率15(0~6%線性)+成交量15(200萬股以上滿分)。未經回測驗證。</div>`;
@@ -151,9 +153,9 @@ function resolve(){const v=$('code').value.trim(),c=v.split(/\s+/)[0];if(S[c])re
 function pick(c){$('code').value=c;$('buy').value='';tab('c');$('go').click();scrollTo(0,0)}
 function status(){$('st').innerHTML=FILES.map(n=>{const d=D[n];return d?`<div style="padding:7px 0;border-bottom:1px solid var(--bd)"><b>${n}</b><br>資料日期:${d.meta.data_date||'來源無日期'}・${d.meta.kept_count} 筆・抓取 ${d.meta.fetched_at.slice(0,16).replace('T',' ')}</div>`:`<div class="bad" style="padding:7px 0"><b>${n}</b> 載入失敗,不使用</div>`}).join('')}
 function show(s){return `<div class="card"><div class="row"><b>${s.code} ${s.name}</b><span class="pill">${s.mk}</span></div>${s.al.length?`<div class="bad">⚠ ${s.al.join('、')}</div>`:''}<table>
- ${row('收盤價('+(s.pd||'無日期')+')',f(s.close,2))}${row('漲跌',f(s.chg,2))}${row('成交量(股)',f(s.vol))}${row('本益比',f(s.pe,2))}${row('股價淨值比',f(s.pb,2))}${row('殖利率 %',f(s.dy,2))}${row('營收年增 %('+(s.rm||'無')+')',f(s.ry,1))}${row('EPS('+(s.ep||'無')+',疑為累計)',f(s.eps,2))}</table>
+ ${row('收盤價('+(s.pd||'無日期')+')',f(s.close,2))}${row('漲跌',f(s.chg,2))}${row('成交量(股)',f(s.vol))}${s.etf?row('基金類型',s.ftype||'資料不足')+row('追蹤指數',s.idx||'資料不足'):`${row('本益比',f(s.pe,2))}${row('股價淨值比',f(s.pb,2))}${row('殖利率 %',f(s.dy,2))}${row('營收年增 %('+(s.rm||'無')+')',f(s.ry,1))}${row('EPS('+(s.ep||'無')+',疑為累計)',f(s.eps,2))}`}</table>
  <div class="mu">來源:證交所/櫃買中心開放資料,收盤後。「資料不足」=來源沒有該欄位,未自行填補。</div><button class="btn sm" onclick="pick('${s.code}')">分析這檔</button></div>`}
-$('s').oninput=()=>{const k=$('s').value.trim();if(!k){$('res').innerHTML='';return}const m=Object.values(S).filter(s=>s.code.startsWith(k)||(s.name||'').includes(k)).slice(0,15);$('res').innerHTML=m.length?m.map(show).join(''):'<div class="card mu">找不到(只收錄上市櫃一般股票)</div>'};
+$('s').oninput=()=>{const k=$('s').value.trim();if(!k){$('res').innerHTML='';return}const m=Object.values(S).filter(s=>s.code.startsWith(k)||(s.name||'').includes(k)).slice(0,15);$('res').innerHTML=m.length?m.map(show).join(''):'<div class="card mu">找不到(只收錄上市櫃一般股票與上市 ETF)</div>'};
 function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t))}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 $('pref').onchange=()=>{$('risk').value=$('pref').value};
