@@ -26,7 +26,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}td{padding:5px 0;border
 .sg{padding:10px;border:1px solid var(--bd);border-top:0;background:var(--cd)}.sg:first-child{border-top:1px solid var(--bd);border-radius:12px 12px 0 0}.sg:last-child{border-radius:0 0 12px 12px}
 nav{position:fixed;left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;background:var(--cd);border:1px solid var(--bd);border-radius:22px;padding:6px;box-shadow:0 4px 18px rgba(60,40,20,.18)}
 nav button{flex:1;border:0;background:none;color:var(--mu);font-size:11.5px;padding:5px 0;border-radius:16px}nav button b{display:block;font-size:21px}nav button.on{color:var(--ac2);background:color-mix(in srgb,var(--ac2) 12%,transparent)}
-.up{color:var(--up)}.dn{color:var(--dn)}.px{font:700 36px "Hiragino Mincho ProN",serif}.star{border:0;background:none;font-size:28px;color:var(--ac2)}.tpl{font-size:12.5px;margin-top:4px}.lk{color:var(--ac);text-decoration:underline;margin-left:6px}.big2{font:700 20px "Hiragino Mincho ProN",serif}.it{padding:10px 0;border-bottom:1px dashed var(--bd)}
+.up{color:var(--up)}.dn{color:var(--dn)}.px{font:700 36px "Hiragino Mincho ProN",serif}.star{border:0;background:none;font-size:28px;color:var(--ac2)}.tpl{font-size:14px;margin-top:4px}.hold{padding:16px 0;border-bottom:1px dashed var(--bd)}.nm{font-size:19px}.px2{font:700 22px "Hiragino Mincho ProN",serif}.pl{font-size:17px;font-weight:600}.pc{font-size:14px;font-weight:500}
+.hb{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 8px;margin-top:12px;padding:12px;background:var(--bg);border-radius:12px}.hb span{display:block;font-size:12.5px;color:var(--mu)}.hb b{font-size:18px;font-variant-numeric:tabular-nums}.acts{margin-top:10px;font-size:14px}.lk{color:var(--ac);text-decoration:underline;margin-left:6px}.big2{font:700 20px "Hiragino Mincho ProN",serif}.it{padding:10px 0;border-bottom:1px dashed var(--bd)}
 details{margin-top:6px}summary{color:var(--ac);font-size:13px}
 </style></head><body>
 <header><svg class="art" viewBox="0 0 400 150" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5cfb8"/><stop offset="1" stop-color="#fdf1dc"/></linearGradient></defs>
@@ -73,13 +74,15 @@ details{margin-top:6px}summary{color:var(--ac);font-size:13px}
 <div id="hl"></div>
 <details class="card"><summary>＋ 新增持股</summary><label>股票(代號或名稱)</label><input id="hs" autocomplete="off" placeholder="請輸入個股名稱或代碼"><div id="hsug"></div>
 <label>種類</label><div class="mu">● 現股 (融資、融券:尚未支援)</div>
-<div class="g"><div><label>總股數</label><input id="hn" type="number" inputmode="numeric"></div><div><label>成交均價(元)</label><input id="ha" type="number" inputmode="decimal"></div></div><button class="btn" id="hsv">儲存</button></details>
+<div class="g"><div><label>總股數</label><input id="hn" type="number" inputmode="numeric"></div><div><label>成交均價(元)</label><input id="ha" type="number" inputmode="decimal"></div></div><button class="btn" id="hsv">儲存</button>
+<label style="margin-top:18px">批次新增(貼上文字)</label><textarea id="bb" rows="4" placeholder="每行一筆:代號或名稱 股數 均價&#10;例:6173 94 310.01" style="width:100%;border-radius:12px;padding:8px;background:var(--bg);color:var(--fg);border:1px solid var(--bd)"></textarea>
+<div class="g" style="margin-top:8px"><select id="bm"><option value="add">加入現有持股</option><option value="rep">取代全部持股</option></select><button class="btn sm" id="bgo" style="margin-top:0">匯入</button></div><div class="mu">可把券商庫存截圖傳給 Claude,請它整理成這種格式,核對後再貼進來。</div></details>
 <details class="card"><summary>持股風險檢查</summary><label>單一股票占比提醒門檻 %(自訂,不是建議值)</label><input id="th" type="number" value="30" inputmode="decimal"><div id="rk" style="margin-top:8px"></div></details>
 <details class="card"><summary>股息目標計算</summary><div class="g"><div><label>每月想領(元)</label><input id="dm" type="number" value="50000" inputmode="decimal"></div><div><label>假設年殖利率 %(自訂)</label><input id="dy" type="number" step="any" inputmode="decimal" placeholder="例:5"></div></div><div id="dv" style="margin-top:8px"></div></details>
 <details class="card"><summary>備份與還原</summary><div class="mu">把自選、持股與目標價複製成文字,存進備忘錄;換手機或資料遺失時貼回來。</div><button class="btn sm" id="bx">產生備份文字</button><textarea id="bt" rows="5" style="width:100%;margin-top:8px;border-radius:12px;padding:8px;background:var(--bg);color:var(--fg);border:1px solid var(--bd)"></textarea><button class="btn sm" id="bi">用上方文字還原(會取代現有資料)</button></details>
 <div class="card mu">持股只存在這支手機的瀏覽器,不會上傳。清除網站資料或換手機會消失。Safari 與「加入主畫面」的 App 資料是分開的,請固定用其中一個。</div></section>
 <section id="d"><div class="card"><h2>資料狀態</h2><div id="st" class="mu">載入中…</div></div>
-<div class="card mu">限制:無盤中行情,不能做當沖訊號。歷史日線還在累積,技術面與回測目前不可用。上市 ETF 可查詢與試算(不進前 20 名);上櫃 ETF、權證、金融保險業財報未納入。上市個股法人買賣超沒有官方來源。EPS 欄位疑為年度累計值。</div></section>
+<div class="card mu">同業估值參考價=收盤價×同市場同產業本益比中位數÷該股本益比,假設該股本益比回到同業水準,不是預測;產業用營收資料裡的分類,分類較粗,虧損股或同業少於 5 檔時不計算。限制:無盤中行情,不能做當沖訊號。歷史日線還在累積,技術面與回測目前不可用。上市 ETF 可查詢與試算(不進前 20 名);上櫃 ETF、權證、金融保險業財報未納入。上市個股法人買賣超沒有官方來源。EPS 欄位疑為年度累計值。</div></section>
 </main>
 <nav><button class="on" data-t="w"><b>⭐</b>自選</button><button data-t="h"><b>💼</b>持股</button><button data-t="c"><b>🗻</b>分析</button><button data-t="r"><b>🌸</b>前20名</button><button data-t="d"><b>📜</b>資料</button></nav>
 <script src="costs.js"></script>
@@ -96,7 +99,7 @@ function build(){
  for(const r of (D.twse_fund_list?D.twse_fund_list.records:[])){const s=S[r['基金代號']];if(s){s.ftype=r['基金類型'];s.idx=r['標的指數/追蹤指數名稱']}}
  for(const [n,ck,a,b,c] of [['twse_valuation','Code','PEratio','PBratio','DividendYield'],['tpex_valuation','SecuritiesCompanyCode','PriceEarningRatio','PriceBookRatio','YieldRatio']])
   for(const r of (D[n]?D[n].records:[])){const s=S[r[ck]];if(s){s.pe=N(r[a]);s.pb=N(r[b]);s.dy=N(r[c])}}
- for(const n of ['twse_revenue','tpex_revenue'])for(const r of (D[n]?D[n].records:[])){const s=S[r['公司代號']];if(s){s.ry=N(r['營業收入-去年同月增減(%)']);s.rm=r['資料年月']}}
+ for(const n of ['twse_revenue','tpex_revenue'])for(const r of (D[n]?D[n].records:[])){const s=S[r['公司代號']];if(s){s.ry=N(r['營業收入-去年同月增減(%)']);s.rm=r['資料年月'];s.ind=r['產業別']}}
  for(const [n,ck,y,q] of [['twse_income','公司代號','年度','季別'],['tpex_income','SecuritiesCompanyCode','Year','Season']])
   for(const r of (D[n]?D[n].records:[])){const s=S[r[ck]];if(s){s.eps=N(r['基本每股盈餘（元）']);s.ep=r[y]+'年第'+r[q]+'季'}}
  for(const [n,ck,t] of [['twse_punish','Code','處置股'],['tpex_disposal','SecuritiesCompanyCode','處置股'],['twse_notice','Code','注意股'],['tpex_warning','SecuritiesCompanyCode','注意股']])
@@ -166,6 +169,7 @@ function status(){$('st').innerHTML=FILES.map(n=>{const d=D[n];return d?`<div st
 const LS={get(k){try{return JSON.parse(localStorage.getItem(k))||[]}catch(e){return[]}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){alert('這個瀏覽器無法儲存資料(可能是無痕模式)');return false}}};
 LS.obj=k=>{try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}catch(e){return{}}};
 const ruleTP=(b,etf,c)=>{const st=dn(b*(1-STOP[c.h]*PF[c.pf]/100),etf);return{stop:st,tgt:up(b+2*(b-st),etf)}};
+const rvd=()=>{const d=DAYS[$('hold').value],x=new Date();if(d==null)return'每季檢視';x.setDate(x.getDate()+d);return x.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'})};
 const tgOf=c=>LS.obj('tg')[c]||{};
 function tpl(s,base){const g=tgOf(s.code),r=ruleTP(base,s.etf,cfg(s.etf)),t=g.t>0?g.t:null,st=g.s>0?g.s:null,cl=s.close;let tag='';
  if(t!=null&&cl!=null&&cl>=t)tag='<span class="pill up">已達目標</span>';else if(st!=null&&cl!=null&&cl<=st)tag='<span class="pill dn">已跌破停損</span>';
@@ -178,10 +182,15 @@ function setTP(c){const g=tgOf(c),a=prompt('目標價(元)。留空=清除,改�
  const o=LS.obj('tg');if(t>0||s>0)o[c]={t:t>0?t:null,s:s>0?s:null};else delete o[c];LS.set('tg',o);rw();rh();if($('s').value)$('s').oninput()}
 const chgp=s=>s.chg!=null&&s.close!=null&&s.close-s.chg>0?s.chg/(s.close-s.chg)*100:null;
 const cc=v=>v==null?'':v>0?'up':v<0?'dn':'';
+const PEG={};
+function peerStats(){Object.keys(PEG).forEach(k=>delete PEG[k]);const T={};Object.values(S).forEach(s=>{if(s.etf||!s.ind||!(s.pe>0))return;const k=s.mk+'|'+s.ind;(T[k]=T[k]||[]).push(s.pe)});
+ Object.keys(T).forEach(k=>{const a=T[k].sort((x,y)=>x-y),m=a.length>>1;PEG[k]={n:a.length,med:a.length%2?a[m]:(a[m-1]+a[m])/2}})}
+function fv(s){if(s.etf)return{r:'ETF 不適用'};if(!(s.pe>0))return{r:'本益比無資料或虧損,無法計算'};const g=PEG[s.mk+'|'+s.ind];if(!g||g.n<5)return{r:'同業資料不足(需至少 5 檔有正本益比)'};const v=s.close*g.med/s.pe;return{v:v,med:g.med,n:g.n,gap:s.close>0?(v/s.close-1)*100:null}}
+function fvh(s){const x=fv(s);return x.v==null?`<div class="mu" style="margin-top:6px">同業估值參考價:${x.r}</div>`:`<div class="mu" style="margin-top:6px">同業估值參考價 <b>${f(x.v,2)}</b>${x.gap==null?'':'('+(x.gap>=0?'+':'')+f(x.gap,1)+'%)'}・同市場「${s.ind}」本益比中位數 ${f(x.med,1)}(${x.n} 檔),本股 ${f(s.pe,1)}。假設本益比回到同業水準,不是預測</div>`}
 function show(s){const p=chgp(s),w=LS.get('wl').includes(s.code),pr=s.close!=null&&s.chg!=null?s.close-s.chg:null;
  return `<div class="card"><div class="row"><div><b>${s.name}</b> <span class="mu">${s.code}</span><div><span class="pill">${s.mk}</span>${s.al.map(a=>`<span class="pill bad">⚠${a}</span>`).join('')}</div></div><button class="star" onclick="tw('${s.code}')">${w?'★':'☆'}</button></div>
  <div class="row"><div class="px ${cc(s.chg)}">${f(s.close,2)}</div><div class="${cc(s.chg)}" style="text-align:right">${s.chg==null?'':(s.chg>0?'▲':s.chg<0?'▼':'')+f(Math.abs(s.chg),2)}<br>${p==null?'':f(Math.abs(p),2)+'%'}</div></div>
- <div class="mu">${s.pd||'無日期'} 收盤資料・非即時</div>${tpl(s,s.close)}
+ <div class="mu">${s.pd||'無日期'} 收盤資料・非即時</div>${tpl(s,s.close)}${fvh(s)}
  <table>${row('開盤 / 最高 / 最低',[s.op,s.hi,s.lo].map(v=>f(v,2)).join(' / '))}${row('昨收',f(pr,2))}${row('成交量(股)',f(s.vol))}${s.etf?row('基金類型',s.ftype||'資料不足')+row('追蹤指數',s.idx||'資料不足'):row('本益比',f(s.pe,2))+row('股價淨值比',f(s.pb,2))+row('殖利率 %',f(s.dy,2))+row('營收年增 %('+(s.rm||'無')+')',f(s.ry,1))+row('EPS('+(s.ep||'無')+',疑為累計)',f(s.eps,2))}</table>
  <div class="mu">來源:證交所/櫃買中心開放資料。「資料不足」=來源沒有,未自行填補。走勢圖:歷史資料累積中,尚無。</div>
  <button class="btn sm" onclick="pick('${s.code}')">分析這檔</button></div>`}
@@ -196,23 +205,31 @@ function del(i){const h=LS.get('hd');h.splice(i,1);LS.set('hd',h);rh()}
 let cur={mv:0,wy:null};
 function rh(){const h=LS.get('hd'),p=cfg(0).p,L=[];let mv=0,tc=0,tn=0,d1=0,html='',ws=0,wv=0,bad=[];
  h.forEach((x,i)=>{const s=S[x.code];if(!s||s.close==null){html+=`<div class="card warn">${x.code} 目前沒有行情,無法估值 <button class="btn sm" onclick="del(${i})">刪除</button></div>`;return}
-  const t=Costs.trade(x.avg,s.close,x.sh,{...p,tax:(s.etf?0.1:0.3)/100});
-  if(s.chg!=null)d1+=s.chg*x.sh;mv+=t.sa;tc+=t.bc;tn+=t.pnl;if(!s.etf&&s.dy>0){ws+=t.sa*s.dy;wv+=t.sa}if(s.al.length)bad.push(s.name+'('+s.al.join('、')+')');L.push({i,x,s,t})});
+  const pp={...p,tax:(s.etf?0.1:0.3)/100},t=Costs.trade(x.avg,s.close,x.sh,pp);
+  if(s.chg!=null)d1+=s.chg*x.sh;mv+=t.sa;tc+=t.bc;tn+=t.pnl;if(!s.etf&&s.dy>0){ws+=t.sa*s.dy;wv+=t.sa}if(s.al.length)bad.push(s.name+'('+s.al.join('、')+')');L.push({i,x,s,t,pp})});
  const th=N($('th').value)||0,hi=[];
  L.forEach(o=>{o.sh=mv>0?o.t.sa/mv*100:0;if(th>0&&o.sh>th)hi.push(`⚠ ${o.s.name} 占 ${f(o.sh,1)}%,超過你設定的 ${f(th,0)}%`)});
- L.forEach(o=>{const s=o.s,t=o.t,p=chgp(s);html+=`<div class="it"><div class="row"><div><b>${s.name}</b> <span class="mu">${s.code}</span><div><span class="pill">現股</span>${s.al.map(a=>`<span class="pill bad">⚠${a}</span>`).join('')}</div></div><div style="text-align:right"><div class="${cc(s.chg)}"><b>${f(s.close,2)}</b> <span class="mu ${cc(s.chg)}">${p==null?'':(p>0?'+':'')+f(p,2)+'%'}</span></div><div class="${cc(t.pnl)}">${t.pnl>0?'+':''}${f(t.pnl)} <span class="mu">(${f(t.ret*100,2)}%)</span></div></div></div>
- <div class="mu">${f(o.x.sh)}股・均價 ${f(o.x.avg,2)}・市值 ${f(t.sa)}・占 ${f(o.sh,1)}%</div>${tpl(s,o.x.avg)}<div style="margin-top:4px"><a class="lk" style="margin-left:0" onclick="del(${o.i})">刪除這筆</a></div></div>`});
+ L.forEach(o=>{const s=o.s,t=o.t,p=chgp(s),g=tgOf(s.code),r=ruleTP(s.close,s.etf,cfg(s.etf)),ut=g.t>0,us=g.s>0,tg=ut?g.t:r.tgt,sp=us?g.s:r.stop,a=Costs.trade(o.x.avg,tg,o.x.sh,o.pp).ret*100,b=Costs.trade(o.x.avg,sp,o.x.sh,o.pp).ret*100;
+ const tag=ut&&s.close>=g.t?'<span class="pill up">已達目標</span>':(us&&s.close<=g.s?'<span class="pill dn">已跌破停損</span>':'');
+ const cell=(l,v,k)=>`<div><span>${l}</span><b class="${k||''}">${v}</b></div>`;
+ html+=`<div class="hold"><div class="row"><div><b class="nm">${s.name}</b><div class="mu">${s.code}・${f(o.x.sh)} 股</div><div><span class="pill">現股</span>${s.al.map(x=>`<span class="pill bad">⚠${x}</span>`).join('')}${tag}</div></div><div style="text-align:right"><div class="px2 ${cc(s.chg)}">${f(s.close,2)} <span class="pc">${p==null?'':(p>0?'+':'')+f(p,2)+'%'}</span></div><div class="pl ${cc(t.pnl)}">${t.pnl>0?'+':''}${f(t.pnl)} <span class="pc">(${f(t.ret*100,2)}%)</span></div></div></div>
+ <div class="hb">${cell('均價',f(o.x.avg,2))}${cell('市值',f(t.sa))}${cell('占比',f(o.sh,1)+'%')}${cell(ut?'目標(自訂)':'目標(規則)',f(tg,2))}${cell(us?'停損(自訂)':'停損(規則)',f(sp,2))}${cell('成本',f(t.bc))}${cell('預估報酬·達標',(a>0?'+':'')+f(a,1)+'%','up')}${cell('預估報酬·停損',f(b,1)+'%','dn')}<div><span>預估達標日期</span><b>無法預估</b><span>檢視日 ${rvd()}</span></div></div>
+ ${fvh(s)}<div class="acts"><a class="lk" style="margin-left:0" onclick="setTP('${s.code}')">自訂目標/停損</a><a class="lk" onclick="del(${o.i})">刪除這筆</a></div></div>`});
  const e=(id,v,k)=>{$(id).textContent=v;if(k!=null)$(id).className='big2 '+k};
  e('d1',L.length?(d1>0?'+':'')+f(d1):'—',cc(d1));$('d1p').textContent=L.length&&mv-d1>0?f(d1/(mv-d1)*100,2)+'%(收盤價較昨收)':'';
  e('d2',L.length?(tn>0?'+':'')+f(tn):'—',cc(tn));$('d2p').textContent=L.length&&tc>0?f(tn/tc*100,2)+'%':'';
  e('tv',L.length?f(mv):'—');e('tc',L.length?f(tc):'—');
  $('tp').innerHTML=L.length?'最近一日損益=(收盤價−昨收)×股數,收盤後資料,不含當天新買的股數與費用。累積損益已扣估算的買賣手續費與證交稅(0.3%、ETF 0.1%,假設值)。':'還沒有持股,請在下方新增。';
  $('rk').innerHTML=(hi.concat(bad.length?['⚠ 持有處置/注意股:'+bad.join('、')]:[])).map(x=>`<div class="w">${x}</div>`).join('')||`<div class="mu">${L.length?'目前沒有觸發提醒。':'新增持股後才會檢查。'}</div>`;
- cur={mv:mv,wy:wv>0?ws/wv:null};$('hl').innerHTML=html?`<div class="card"><h2>庫存(${L.length} 檔)</h2>${html}<div class="mu">目標價/停損價為你自訂;沒設定時顯示「規則」建議(依持有期間與風險偏好、以成本價計算,是風險管理規則,不是預測)。已達目標或跌破停損是依最近收盤價判斷。</div></div>`:'';rdv()}
+ cur={mv:mv,wy:wv>0?ws/wv:null};$('hl').innerHTML=html?`<div class="card"><h2>庫存(${L.length} 檔)</h2>${html}<div class="mu">目標與停損預設用「規則」:依你在「分析」頁選的持有時間與風險偏好,以最新收盤價為基準算出(停損距離固定%,目標=風險報酬1:2),是風險管理規則,<b>不是對行情的預測</b>。達標/停損報酬是已扣估算費稅的情境數字,不是預估會發生。無法預測達標日期,所以改顯示檢視日(持有期結束日)。</div></div>`:'';rdv()}
 function rdv(){const m=N($('dm').value),y=N($('dy').value);
  if(!(m>0))return $('dv').innerHTML='<div class="mu">請輸入每月想領的金額。</div>';
  const ys=[];if(y>0)ys.push(['你設定',y]);if(cur.wy>0)ys.push(['持股加權殖利率',cur.wy]);[3,5,7].forEach(v=>ys.push(['假設',v]));
  $('dv').innerHTML='<table>'+ys.map(a=>{const need=m*12/(a[1]/100),gap=need-cur.mv;return row(a[0]+' '+f(a[1],2)+'%',f(need)+' 元'+(cur.mv>0?'(還差 '+f(Math.max(gap,0))+')':''))}).join('')+'</table><div class="mu">需要本金=每月金額×12÷殖利率。殖利率不保證、股利每年會變,未扣股利所得稅與二代健保補充保費。「持股加權殖利率」用資料中的殖利率依市值加權(ETF 無此欄位,不計入)。這只是算術,不預測何時能達成。</div>'}
+function parseHold(txt){const out=[],err=[];txt.split(/\r?\n/).forEach((ln,i)=>{ln=ln.trim();if(!ln)return;const k=ln.split(/[\s，、\t]+/);if(k.length<3){err.push(i+1);return}const avg=N(k.pop()),sh=N(k.pop()),key=k.join(''),m=find(key),s=S[key]||(m.length==1?m[0]:m.find(z=>z.name===key));if(!s||!(sh>0)||sh!=Math.floor(sh)||!(avg>0))err.push(i+1);else out.push({code:s.code,sh:sh,avg:avg})});return{out:out,err:err}}
+$('bgo').onclick=()=>{const r=parseHold($('bb').value);if(r.err.length)return alert('第 '+r.err.join('、')+' 行無法辨識(找不到股票、股數不是整數或價格有誤),未匯入任何資料');if(!r.out.length)return alert('沒有可匯入的內容');
+ const rp=$('bm').value==='rep';if(!confirm((rp?'取代全部持股為 ':'加入 ')+r.out.length+' 筆:\n'+r.out.map(x=>x.code+' '+x.sh+'股 @'+x.avg).join('\n')))return;
+ const h=rp?[]:LS.get('hd');if(LS.set('hd',h.concat(r.out))){$('bb').value='';rh()}};
 $('th').oninput=rh;$('dm').oninput=rdv;$('dy').oninput=rdv;
 $('bx').onclick=()=>{$('bt').value=JSON.stringify({v:1,wl:LS.get('wl'),hd:LS.get('hd'),tg:LS.obj('tg')});$('bt').select();try{navigator.clipboard.writeText($('bt').value)}catch(e){}};
 const OKC=c=>typeof c==='string'&&/^[0-9A-Za-z]{2,8}$/.test(c);
@@ -221,5 +238,5 @@ $('bi').onclick=()=>{let o;try{o=JSON.parse($('bt').value)}catch(e){return alert
 function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t))}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 $('pref').onchange=()=>{$('risk').value=$('pref').value};
-(async()=>{await Promise.all(FILES.map(load));build();status();rw();rh();if(!D.twse_price&&!D.tpex_price)$('st').insertAdjacentHTML('afterbegin','<div class="bad">行情資料載入失敗,無法查詢與排名。</div>')})();
+(async()=>{await Promise.all(FILES.map(load));build();peerStats();status();rw();rh();if(!D.twse_price&&!D.tpex_price)$('st').insertAdjacentHTML('afterbegin','<div class="bad">行情資料載入失敗,無法查詢與排名。</div>')})();
 </script></body></html>
