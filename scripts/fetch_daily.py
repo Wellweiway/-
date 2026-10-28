@@ -246,6 +246,12 @@ def main(fetch=fetch_json):
     results = []
     for cfg in DATASETS:
         st, recs = process(cfg, whitelists, fetch_date, now.isoformat(), first_seen, fetch)
+        if cfg["role"] == "company" and st["result"] == "failed":
+            old = read_json("data/latest/%s.json" % cfg["name"])
+            if old and old.get("records"):
+                recs = old["records"]
+                st["result"] = "fallback_cached"
+                st["note"] = "本次抓取失敗,沿用上次成功的名單(資料日 %s)" % (old.get("meta", {}).get("data_date"),)
         results.append(st)
         if cfg["role"] == "company" and recs and st["result"] != "failed":
             whitelists[cfg["wlkey"] or cfg["market"]] = {code_of(r) for r in recs}
@@ -260,6 +266,7 @@ def main(fetch=fetch_json):
         "run_at": now.isoformat(),
         "fetch_date": fetch_date,
         "failed_count": len(failed),
+        "fallback_count": len([r for r in results if r["result"] == "fallback_cached"]),
         "datasets": results,
         "ranges": ranges,
         "whitelist_sizes": {k: len(v) for k, v in whitelists.items()},
