@@ -1,7 +1,7 @@
-import json, os, sys, time, hashlib, urllib.request
+import json, os, sys, time, hashlib, gzip, urllib.request
 from datetime import datetime, timezone, timedelta
 
-UA = {"User-Agent": "Mozilla/5.0 (personal research)"}
+UA = {"User-Agent": "Mozilla/5.0 (personal research)", "Accept-Encoding": "gzip"}
 TW = timezone(timedelta(hours=8))
 BASES = {
     "twse": "https://openapi.twse.com.tw/v1",
@@ -53,13 +53,16 @@ def write_json(path, obj):
         json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
 
 
-def fetch_json(url, tries=3):
+def fetch_json(url, tries=4):
     last = None
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers=UA)
             with urllib.request.urlopen(req, timeout=60) as r:
-                return json.loads(r.read())
+                body = r.read()
+                if (r.headers.get("Content-Encoding") or "").lower() == "gzip":
+                    body = gzip.decompress(body)
+            return json.loads(body)
         except Exception as e:
             last = e
             time.sleep(3 * (i + 1))
@@ -111,7 +114,7 @@ DATASETS = [
     D("twse_index_tw50", "twse", "/indicesReport/TAI50I", "daily", "Date", filt=False),
     D("twse_delisted", "twse", "/company/suspendListingCsvAndHtml", "static", None, filt=False),
     # 上櫃
-    D("tpex_price", "tpex", "/tpex_mainboard_daily_close_quotes", "daily", "Date", min_rows=300),
+    D("tpex_price", "tpex", "/tpex_mainboard_quotes", "daily", "Date", min_rows=700),
     D("tpex_valuation", "tpex", "/tpex_mainboard_peratio_analysis", "daily", "Date", min_rows=300),
     D("tpex_institutional", "tpex", "/tpex_3insti_daily_trading", "daily", "Date"),
     D("tpex_margin", "tpex", "/tpex_mainboard_margin_balance", "daily", "Date"),
