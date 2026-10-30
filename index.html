@@ -187,10 +187,20 @@ function peerStats(){Object.keys(PEG).forEach(k=>delete PEG[k]);const T={};Objec
  Object.keys(T).forEach(k=>{const a=T[k].sort((x,y)=>x-y),m=a.length>>1;PEG[k]={n:a.length,med:a.length%2?a[m]:(a[m-1]+a[m])/2}})}
 function fv(s){if(s.etf)return{r:'ETF 不適用'};if(!(s.pe>0))return{r:'本益比無資料或虧損,無法計算'};const g=PEG[s.mk+'|'+s.ind];if(!g||g.n<5)return{r:'同業資料不足(需至少 5 檔有正本益比)'};const v=s.close*g.med/s.pe;return{v:v,med:g.med,n:g.n,gap:s.close>0?(v/s.close-1)*100:null}}
 function fvh(s){const x=fv(s);return x.v==null?`<div class="mu" style="margin-top:6px">同業估值參考價:${x.r}</div>`:`<div class="mu" style="margin-top:6px">同業估值參考價 <b>${f(x.v,2)}</b>${x.gap==null?'':'('+(x.gap>=0?'+':'')+f(x.gap,1)+'%)'}・同市場「${s.ind}」本益比中位數 ${f(x.med,1)}(${x.n} 檔),本股 ${f(s.pe,1)}。假設本益比回到同業水準,不是預測</div>`}
+let SER=null;
+async function loadSeries(){try{const r=await fetch('data/series/closes.json',{cache:'no-store'});if(!r.ok)throw 0;SER=await r.json()}catch(e){SER=null}}
+const sg2=x=>(x>=0?'+':'')+f(x,1)+'%';
+function trend(s){if(!SER)return{r:'走勢資料載入失敗'};const a=SER.closes[s.code];if(!a)return{r:'這檔沒有歷史收盤資料'};
+ const D=SER.meta.dates,pts=[];a.forEach((v,i)=>{if(v!=null)pts.push([D[i],v])});
+ if(pts.length<5)return{r:'歷史收盤只有 '+pts.length+' 筆,不足 5 筆'};
+ const l5=pts.slice(-5),ma=l5.reduce((x,p)=>x+p[1],0)/5,last=pts[pts.length-1],o={ma:ma,from:l5[0][0],to:last[0],gap:(last[1]/ma-1)*100};
+ if(pts.length>=6){const b=pts[pts.length-6];o.chg=(last[1]/b[1]-1)*100;o.b=b[0]}return o}
+function trh(s){const t=trend(s);if(t.r)return `<div class="mu" style="margin-top:6px">5日均價:${t.r}</div>`;const md=x=>x.slice(5).replace('-','/');
+ return `<div class="mu" style="margin-top:6px">5日均價 <b>${f(t.ma,2)}</b>(${md(t.from)}~${md(t.to)} 的 5 筆收盤),最新收盤距均價 ${sg2(t.gap)}${t.chg==null?'':`・近 5 筆漲跌 <b class="${cc(t.chg)}">${sg2(t.chg)}</b>(${md(t.b)}→${md(t.to)})`}。收盤價未還原除權息,區間內有除息的股票或 ETF,漲跌會被低估。</div>`}
 function show(s){const p=chgp(s),w=LS.get('wl').includes(s.code),pr=s.close!=null&&s.chg!=null?s.close-s.chg:null;
  return `<div class="card"><div class="row"><div><b>${s.name}</b> <span class="mu">${s.code}</span><div><span class="pill">${s.mk}</span>${s.al.map(a=>`<span class="pill bad">⚠${a}</span>`).join('')}</div></div><button class="star" onclick="tw('${s.code}')">${w?'★':'☆'}</button></div>
  <div class="row"><div class="px ${cc(s.chg)}">${f(s.close,2)}</div><div class="${cc(s.chg)}" style="text-align:right">${s.chg==null?'':(s.chg>0?'▲':s.chg<0?'▼':'')+f(Math.abs(s.chg),2)}<br>${p==null?'':f(Math.abs(p),2)+'%'}</div></div>
- <div class="mu">${s.pd||'無日期'} 收盤資料・非即時</div>${tpl(s,s.close)}${fvh(s)}
+ <div class="mu">${s.pd||'無日期'} 收盤資料・非即時</div>${tpl(s,s.close)}${fvh(s)}${trh(s)}
  <table>${row('開盤 / 最高 / 最低',[s.op,s.hi,s.lo].map(v=>f(v,2)).join(' / '))}${row('昨收',f(pr,2))}${row('成交量(股)',f(s.vol))}${s.etf?row('基金類型',s.ftype||'資料不足')+row('追蹤指數',s.idx||'資料不足'):row('本益比',f(s.pe,2))+row('股價淨值比',f(s.pb,2))+row('殖利率 %',f(s.dy,2))+row('營收年增 %('+(s.rm||'無')+')',f(s.ry,1))+row('EPS('+(s.ep||'無')+',疑為累計)',f(s.eps,2))}</table>
  <div class="mu">來源:證交所/櫃買中心開放資料。「資料不足」=來源沒有,未自行填補。走勢圖:歷史資料累積中,尚無。</div>
  <button class="btn sm" onclick="pick('${s.code}')">分析這檔</button></div>`}
@@ -214,7 +224,7 @@ function rh(){const h=LS.get('hd'),p=cfg(0).p,L=[];let mv=0,tc=0,tn=0,d1=0,html=
  const cell=(l,v,k)=>`<div><span>${l}</span><b class="${k||''}">${v}</b></div>`;
  html+=`<div class="hold"><div class="row"><div><b class="nm">${s.name}</b><div class="mu">${s.code}・${f(o.x.sh)} 股</div><div><span class="pill">現股</span>${s.al.map(x=>`<span class="pill bad">⚠${x}</span>`).join('')}${tag}</div></div><div style="text-align:right"><div class="px2 ${cc(s.chg)}">${f(s.close,2)} <span class="pc">${p==null?'':(p>0?'+':'')+f(p,2)+'%'}</span></div><div class="pl ${cc(t.pnl)}">${t.pnl>0?'+':''}${f(t.pnl)} <span class="pc">(${f(t.ret*100,2)}%)</span></div></div></div>
  <div class="hb">${cell('均價',f(o.x.avg,2))}${cell('市值',f(t.sa))}${cell('占比',f(o.sh,1)+'%')}${cell(ut?'目標(自訂)':'目標(規則)',f(tg,2))}${cell(us?'停損(自訂)':'停損(規則)',f(sp,2))}${cell('成本',f(t.bc))}${cell('預估報酬·達標',(a>0?'+':'')+f(a,1)+'%','up')}${cell('預估報酬·停損',f(b,1)+'%','dn')}<div><span>預估達標日期</span><b>無法預估</b><span>檢視日 ${rvd()}</span></div></div>
- ${fvh(s)}<div class="acts"><a class="lk" style="margin-left:0" onclick="setTP('${s.code}')">自訂目標/停損</a><a class="lk" onclick="del(${o.i})">刪除這筆</a></div></div>`});
+ ${fvh(s)}${trh(s)}<div class="acts"><a class="lk" style="margin-left:0" onclick="setTP('${s.code}')">自訂目標/停損</a><a class="lk" onclick="del(${o.i})">刪除這筆</a></div></div>`});
  const e=(id,v,k)=>{$(id).textContent=v;if(k!=null)$(id).className='big2 '+k};
  e('d1',L.length?(d1>0?'+':'')+f(d1):'—',cc(d1));$('d1p').textContent=L.length&&mv-d1>0?f(d1/(mv-d1)*100,2)+'%(收盤價較昨收)':'';
  e('d2',L.length?(tn>0?'+':'')+f(tn):'—',cc(tn));$('d2p').textContent=L.length&&tc>0?f(tn/tc*100,2)+'%':'';
@@ -238,5 +248,5 @@ $('bi').onclick=()=>{let o;try{o=JSON.parse($('bt').value)}catch(e){return alert
 function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==t))}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 $('pref').onchange=()=>{$('risk').value=$('pref').value};
-(async()=>{await Promise.all(FILES.map(load));build();peerStats();status();rw();rh();if(!D.twse_price&&!D.tpex_price)$('st').insertAdjacentHTML('afterbegin','<div class="bad">行情資料載入失敗,無法查詢與排名。</div>')})();
+(async()=>{await Promise.all(FILES.map(load).concat([loadSeries()]));build();peerStats();status();rw();rh();if(!D.twse_price&&!D.tpex_price)$('st').insertAdjacentHTML('afterbegin','<div class="bad">行情資料載入失敗,無法查詢與排名。</div>')})();
 </script></body></html>
