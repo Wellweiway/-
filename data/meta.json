@@ -1,24 +1,24 @@
 {
-  "run_utc": "2026-11-02T09:32:26.307506+00:00",
+  "run_utc": "2026-11-03T09:16:24.737612+00:00",
   "checks": [
     {
       "name": "TWSE STOCK_DAY_ALL",
       "url": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",
       "status": 200,
       "records": 1389,
-      "data_date_raw": "1151030",
+      "data_date_raw": "1151102",
       "sample": {
-        "Date": "1151030",
+        "Date": "1151102",
         "Code": "00400A",
         "Name": "主動國泰動能高息",
-        "TradeVolume": "66823675",
-        "TradeValue": "918376509",
-        "OpeningPrice": "13.81",
-        "HighestPrice": "13.93",
-        "LowestPrice": "13.60",
-        "ClosingPrice": "13.80",
-        "Change": "-0.5600",
-        "Transaction": "21233"
+        "TradeVolume": "40358170",
+        "TradeValue": "552309165",
+        "OpeningPrice": "13.60",
+        "HighestPrice": "13.88",
+        "LowestPrice": "13.53",
+        "ClosingPrice": "13.79",
+        "Change": "-0.0100",
+        "Transaction": "10836"
       },
       "ok": true
     },
