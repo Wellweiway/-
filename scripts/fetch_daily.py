@@ -525,7 +525,39 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         st["result"] = "failed"
         st["error"] = repr(e)
 
-        # 只有營收資料允許沿用上次成功資料
+                # 營收與終止上市資料：失敗時優先沿用上次成功資料
+        if cfg["name"] in (
+            "twse_revenue",
+            "tpex_revenue",
+            "twse_delisted"
+        ):
+            old = read_json(latest_path)
+
+            if old and isinstance(old.get("records"), list) and old["records"]:
+                old_dd = old.get("meta", {}).get("data_date")
+
+                st["result"] = "fallback_cached"
+                st["data_date"] = old_dd
+                st["kept_count"] = len(old["records"])
+                st["note"] = (
+                    "本次資料抓取失敗，沿用上次成功資料；"
+                    "資料日期為 %s，並非本次更新"
+                    % (old_dd or "未知")
+                )
+
+                return st, old["records"]
+
+            # 終止上市資料不是行情計算的必要資料，
+            # 沒有舊資料時標記為暫時無法取得，不使整個工作流程失敗
+            if cfg["name"] == "twse_delisted":
+                st["result"] = "unavailable_optional"
+                st["note"] = (
+                    "終止上市公司資料來源暫時無法取得，"
+                    "目前沒有可沿用的舊資料。"
+                )
+                return st, None
+
+        return st, None
         if cfg["name"] in ("twse_revenue", "tpex_revenue"):
             old = read_json(latest_path)
 
