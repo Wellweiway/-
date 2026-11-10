@@ -1,5 +1,15 @@
-import json, os, sys, time, hashlib, gzip, urllib.request
+import json
+import os
+import sys
+import time
+import hashlib
+import gzip
+import urllib.request
+import csv
+import io
+
 from datetime import datetime, timezone, timedelta
+
 
 UA = {
     "User-Agent": "Mozilla/5.0 (personal research)",
@@ -34,6 +44,7 @@ def parse_date(raw):
     try:
         if "/" in s:
             y, m, d = [int(x) for x in s.split("/")]
+
             if y < 1911:
                 y += 1911
 
@@ -60,6 +71,7 @@ def code_of(rec):
     for k in CODE_KEYS:
         if k in rec:
             return str(rec[k]).strip()
+
     return None
 
 
@@ -67,6 +79,7 @@ def read_json(path):
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
+
     except Exception:
         return None
 
@@ -84,6 +97,11 @@ def write_json(path, obj):
 
 
 def fetch_json(url, tries=4):
+    """
+    同時支援 JSON 與 CSV。
+    API 回傳 HTML 或其他錯誤格式時仍會回報錯誤，
+    不會把錯誤頁面當成正常資料。
+    """
     last = None
 
     for i in range(tries):
@@ -92,9 +110,11 @@ def fetch_json(url, tries=4):
 
             with urllib.request.urlopen(req, timeout=60) as r:
                 status = getattr(r, "status", "unknown")
+
                 content_type = r.headers.get(
                     "Content-Type", "unknown"
                 )
+
                 content_encoding = (
                     r.headers.get("Content-Encoding") or ""
                 ).lower()
@@ -112,23 +132,51 @@ def fetch_json(url, tries=4):
                     f"(HTTP {status}, Content-Type: {content_type})"
                 )
 
-            # 解碼並檢查 JSON
+            # 解碼，並自動移除 UTF-8 BOM
             text = body.decode("utf-8-sig").strip()
 
             if not text:
                 raise ValueError("API 回傳內容解碼後為空白")
 
-            try:
-                data = json.loads(text)
+            # CSV 格式
+            if "text/csv" in content_type.lower():
+                try:
+                    data = list(
+                        csv.DictReader(io.StringIO(text))
+                    )
 
-            except json.JSONDecodeError as e:
-                preview = text[:200].replace("\n", " ").replace("\r", " ")
+                except Exception as e:
+                    raise ValueError(
+                        f"API 回傳 CSV 解析失敗：{e}"
+                    ) from e
 
-                raise ValueError(
-                    f"API 回傳不是有效 JSON "
-                    f"(HTTP {status}, Content-Type: {content_type})；"
-                    f"內容開頭：{preview!r}"
-                ) from e
+                if not data:
+                    raise ValueError("API 回傳 CSV 沒有資料")
+
+                # 確認 CSV 至少有一個有效欄位
+                if not any(
+                    key and str(key).strip()
+                    for key in data[0].keys()
+                ):
+                    raise ValueError("CSV 沒有有效欄位名稱")
+
+            # JSON 格式
+            else:
+                try:
+                    data = json.loads(text)
+
+                except json.JSONDecodeError as e:
+                    preview = (
+                        text[:200]
+                        .replace("\n", " ")
+                        .replace("\r", " ")
+                    )
+
+                    raise ValueError(
+                        f"API 回傳不是有效 JSON "
+                        f"(HTTP {status}, Content-Type: {content_type})；"
+                        f"內容開頭：{preview!r}"
+                    ) from e
 
             return data
 
@@ -139,7 +187,7 @@ def fetch_json(url, tries=4):
                 time.sleep(3 * (i + 1))
 
     raise RuntimeError(
-        f"下載 JSON 失敗，共嘗試 {tries} 次：{url}；"
+        f"下載資料失敗，共嘗試 {tries} 次：{url}；"
         f"最後錯誤：{last!r}"
     ) from last
 
@@ -294,12 +342,14 @@ DATASETS = [
         filt=False
     ),
 
+    # 臺灣50指數：此 API 回傳 CSV，日期欄位為「日期」
     D(
         "twse_index_tw50", "twse",
-        "/indicesReport/TAI50I", "daily", "Date",
+        "/indicesReport/TAI50I", "daily", "日期",
         filt=False
     ),
 
+    # 終止上市公司
     D(
         "twse_delisted", "twse",
         "/company/suspendListingCsvAndHtml", "static", None,
@@ -375,6 +425,7 @@ RANGE_CHECKS = [
 
 def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
     url = BASES[cfg["market"]] + cfg["path"]
+
     st = {
         "name": cfg["name"],
         "url": url
@@ -388,7 +439,11 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         if not isinstance(raw, list):
             raise ValueError("回傳不是清單")
 
-        raw = [r for r in raw if isinstance(r, dict)]
+        raw = [
+            r for r in raw
+            if isinstance(r, dict)
+        ]
+
         st["raw_count"] = len(raw)
 
         # 資料日期：取全部原始資料中最新的有效日期
@@ -400,11 +455,16 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
                 for r in raw
             ]
 
-            ds = [d for d in ds if d]
+            ds = [
+                d for d in ds
+                if d
+            ]
+
             dd = max(ds) if ds else None
 
         recs = raw
 
+        # 依上市／上櫃公司名單過濾
         if cfg["filt"]:
             wl = whitelists.get(
                 cfg["usewl"] or cfg["market"]
@@ -418,9 +478,13 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
                 if code_of(r) in wl
             ]
 
+        # 保留指定欄位
         if cfg["keep"]:
             recs = [
-                {k: r.get(k) for k in cfg["keep"]}
+                {
+                    k: r.get(k)
+                    for k in cfg["keep"]
+                }
                 for r in recs
             ]
 
@@ -444,13 +508,19 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         st["data_date"] = dd
 
         old = read_json(latest_path)
-        old_dd = (old or {}).get("meta", {}).get("data_date")
+
+        old_dd = (
+            (old or {})
+            .get("meta", {})
+            .get("data_date")
+        )
 
         # 避免舊資料覆蓋新資料
         if dd and old_dd and dd < old_dd:
             st["result"] = "stale_skipped"
             return st, (old or {}).get("records")
 
+        # 計算資料內容雜湊值
         h = hashlib.sha256(
             json.dumps(
                 recs,
@@ -495,7 +565,10 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
                     payload
                 )
 
-        st["result"] = "ok" if changed else "unchanged"
+        st["result"] = (
+            "ok" if changed
+            else "unchanged"
+        )
 
         # 財報首次被本系統看到的日期
         if cfg["fs"]:
@@ -525,7 +598,7 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         st["result"] = "failed"
         st["error"] = repr(e)
 
-                # 營收與終止上市資料：失敗時優先沿用上次成功資料
+        # 營收與終止上市資料：失敗時優先沿用上次成功資料
         if cfg["name"] in (
             "twse_revenue",
             "tpex_revenue",
@@ -533,12 +606,20 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         ):
             old = read_json(latest_path)
 
-            if old and isinstance(old.get("records"), list) and old["records"]:
-                old_dd = old.get("meta", {}).get("data_date")
+            if (
+                old
+                and isinstance(old.get("records"), list)
+                and old["records"]
+            ):
+                old_dd = (
+                    old.get("meta", {})
+                    .get("data_date")
+                )
 
                 st["result"] = "fallback_cached"
                 st["data_date"] = old_dd
                 st["kept_count"] = len(old["records"])
+
                 st["note"] = (
                     "本次資料抓取失敗，沿用上次成功資料；"
                     "資料日期為 %s，並非本次更新"
@@ -547,39 +628,24 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
                 return st, old["records"]
 
-            # 終止上市資料不是行情計算的必要資料，
-            # 沒有舊資料時標記為暫時無法取得，不使整個工作流程失敗
+            # 終止上市資料不是行情計算的必要資料。
+            # 沒有舊資料時標記為暫時無法取得，不使整個流程失敗。
             if cfg["name"] == "twse_delisted":
                 st["result"] = "unavailable_optional"
+
                 st["note"] = (
                     "終止上市公司資料來源暫時無法取得，"
                     "目前沒有可沿用的舊資料。"
                 )
+
                 return st, None
-
-        return st, None
-        if cfg["name"] in ("twse_revenue", "tpex_revenue"):
-            old = read_json(latest_path)
-
-            if old and isinstance(old.get("records"), list) and old["records"]:
-                old_dd = old.get("meta", {}).get("data_date")
-
-                st["result"] = "fallback_cached"
-                st["data_date"] = old_dd
-                st["kept_count"] = len(old["records"])
-                st["note"] = (
-                    "本次營收資料抓取失敗，沿用上次成功資料；"
-                    "資料日期為 %s，並非本次更新"
-                    % (old_dd or "未知")
-                )
-
-                return st, old["records"]
 
         return st, None
 
 
 def range_check(name, market, path, key, sample_code, fetch):
     url = BASES[market] + path
+
     st = {
         "name": name,
         "url": url
@@ -644,18 +710,25 @@ def main(fetch=fetch_json):
         )
 
         # 公司名單抓取失敗時，沿用上次成功名單
-        if cfg["role"] == "company" and st["result"] == "failed":
+        if (
+            cfg["role"] == "company"
+            and st["result"] == "failed"
+        ):
             old = read_json(
                 "data/latest/%s.json" % cfg["name"]
             )
 
             if old and old.get("records"):
                 recs = old["records"]
+
                 st["result"] = "fallback_cached"
+
                 st["note"] = (
                     "本次抓取失敗，沿用上次成功的名單"
                     "（資料日 %s）"
-                    % (old.get("meta", {}).get("data_date"),)
+                    % (
+                        old.get("meta", {}).get("data_date"),
+                    )
                 )
 
         results.append(st)
@@ -733,7 +806,18 @@ def main(fetch=fetch_json):
                     for r in results
                     if r["result"] == "fallback_cached"
                 ],
-                "ok": len(results) + len(ranges) - len(failed),
+                "unavailable": [
+                    (
+                        r["name"],
+                        r.get("note")
+                    )
+                    for r in results
+                    if r["result"] == "unavailable_optional"
+                ],
+                "ok": sum(
+                    r["result"] in ("ok", "unchanged")
+                    for r in results + ranges
+                ),
             },
             ensure_ascii=False
         )
