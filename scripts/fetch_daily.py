@@ -1,3 +1,4 @@
+
 import json
 import os
 import sys
@@ -7,6 +8,8 @@ import gzip
 import urllib.request
 import csv
 import io
+import re
+import unicodedata
 
 from datetime import datetime, timezone, timedelta
 
@@ -34,46 +37,101 @@ CODE_KEYS = [
 SLEEP = 1.5
 
 
+# =========================================================
+# 資料格式正規化
+# =========================================================
+
+def normalize_text(value):
+    if value is None:
+        return ""
+
+    return unicodedata.normalize(
+        "NFKC",
+        str(value).replace("\ufeff", "")
+    ).strip()
+
+
+def normalize_key(value):
+    return re.sub(r"\s+", "", normalize_text(value))
+
+
+def get_field(record, wanted):
+    if not isinstance(record, dict):
+        return None
+
+    target = normalize_key(wanted)
+
+    if wanted in record:
+        return record[wanted]
+
+    for key, value in record.items():
+        if normalize_key(key) == target:
+            return value
+
+    return None
+
+
 def parse_date(raw):
-    """支援民國7位、西元8位、民國斜線日期。失敗回傳None。"""
+    """
+    支援：
+    民國日期：1151102、115/11/02
+    西元日期：20261102、2026/11/02
+    全形數字、引號、空白及其他分隔符號。
+    """
+
     if raw is None:
         return None
 
-    s = str(raw).strip()
+    s = normalize_text(raw).strip().strip('"').strip("'")
+
+    if not s:
+        return None
 
     try:
-        if "/" in s:
-            y, m, d = [int(x) for x in s.split("/")]
+        parts = re.findall(r"\d+", s)
+
+        if len(parts) == 3:
+            y, m, d = [int(x) for x in parts]
 
             if y < 1911:
                 y += 1911
 
-        elif len(s) == 7 and s.isdigit():
-            y = int(s[:3]) + 1911
-            m = int(s[3:5])
-            d = int(s[5:7])
+            return datetime(y, m, d).date().isoformat()
 
-        elif len(s) == 8 and s.isdigit():
-            y = int(s[:4])
-            m = int(s[4:6])
-            d = int(s[6:8])
+        digits = re.sub(r"\D", "", s)
+
+        if len(digits) == 7:
+            y = int(digits[:3]) + 1911
+            m = int(digits[3:5])
+            d = int(digits[5:7])
+
+        elif len(digits) == 8:
+            y = int(digits[:4])
+            m = int(digits[4:6])
+            d = int(digits[6:8])
 
         else:
             return None
 
         return datetime(y, m, d).date().isoformat()
 
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
 def code_of(rec):
     for k in CODE_KEYS:
-        if k in rec:
-            return str(rec[k]).strip()
+        value = get_field(rec, k)
+
+        if value is not None and str(value).strip():
+            return str(value).strip()
 
     return None
 
+
+# =========================================================
+# JSON 讀寫
+# =========================================================
 
 def read_json(path):
     try:
@@ -85,7 +143,10 @@ def read_json(path):
 
 
 def write_json(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    folder = os.path.dirname(path)
+
+    if folder:
+        os.makedirs(folder, exist_ok=True)
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(
@@ -96,12 +157,11 @@ def write_json(path, obj):
         )
 
 
+# =========================================================
+# API 資料抓取：支援 JSON、CSV、GZIP
+# =========================================================
+
 def fetch_json(url, tries=4):
-    """
-    同時支援 JSON 與 CSV。
-    API 回傳 HTML 或其他錯誤格式時仍會回報錯誤，
-    不會把錯誤頁面當成正常資料。
-    """
     last = None
 
     for i in range(tries):
@@ -121,46 +181,55 @@ def fetch_json(url, tries=4):
 
                 body = r.read()
 
-            # 處理 gzip 壓縮資料
             if content_encoding == "gzip" or body[:2] == b"\x1f\x8b":
                 body = gzip.decompress(body)
 
-            # 檢查是否為空白回應
             if not body or not body.strip():
                 raise ValueError(
                     f"API 回傳空白內容 "
                     f"(HTTP {status}, Content-Type: {content_type})"
                 )
 
-            # 解碼，並自動移除 UTF-8 BOM
             text = body.decode("utf-8-sig").strip()
 
             if not text:
                 raise ValueError("API 回傳內容解碼後為空白")
 
-            # CSV 格式
-            if "text/csv" in content_type.lower():
-                try:
-                    data = list(
-                        csv.DictReader(io.StringIO(text))
-                    )
+            # CSV
+            if "csv" in content_type.lower():
 
-                except Exception as e:
-                    raise ValueError(
-                        f"API 回傳 CSV 解析失敗：{e}"
-                    ) from e
+                reader = csv.DictReader(
+                    io.StringIO(text, newline="")
+                )
+
+                data = []
+
+                for row in reader:
+                    clean_row = {}
+
+                    for key, value in row.items():
+                        clean_key = normalize_text(key)
+
+                        clean_value = (
+                            normalize_text(value)
+                            if value is not None
+                            else None
+                        )
+
+                        clean_row[clean_key] = clean_value
+
+                    data.append(clean_row)
 
                 if not data:
                     raise ValueError("API 回傳 CSV 沒有資料")
 
-                # 確認 CSV 至少有一個有效欄位
                 if not any(
                     key and str(key).strip()
                     for key in data[0].keys()
                 ):
                     raise ValueError("CSV 沒有有效欄位名稱")
 
-            # JSON 格式
+            # JSON
             else:
                 try:
                     data = json.loads(text)
@@ -192,7 +261,10 @@ def fetch_json(url, tries=4):
     ) from last
 
 
-# 資料集設定函式
+# =========================================================
+# 資料集設定
+# =========================================================
+
 def D(
     name,
     market,
@@ -226,6 +298,7 @@ def D(
 
 
 DATASETS = [
+
     # 公司名單
     D(
         "twse_company", "twse",
@@ -248,7 +321,7 @@ DATASETS = [
         ]
     ),
 
-    # 上市 ETF 名單
+    # ETF 名單
     D(
         "twse_fund_list", "twse",
         "/opendata/t187ap47_L", "static", "出表日期",
@@ -342,7 +415,7 @@ DATASETS = [
         filt=False
     ),
 
-    # 臺灣50指數：此 API 回傳 CSV，日期欄位為「日期」
+    # 臺灣50指數 CSV
     D(
         "twse_index_tw50", "twse",
         "/indicesReport/TAI50I", "daily", "日期",
@@ -410,7 +483,7 @@ DATASETS = [
 ]
 
 
-# 只檢查歷史涵蓋多長，不儲存內容
+# 歷史資料涵蓋範圍檢查
 RANGE_CHECKS = [
     (
         "twse_monthly_range", "twse",
@@ -423,7 +496,12 @@ RANGE_CHECKS = [
 ]
 
 
+# =========================================================
+# 主要資料處理
+# =========================================================
+
 def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
+
     url = BASES[cfg["market"]] + cfg["path"]
 
     st = {
@@ -434,6 +512,7 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
     latest_path = "data/latest/%s.json" % cfg["name"]
 
     try:
+
         raw = fetch(url)
 
         if not isinstance(raw, list):
@@ -446,12 +525,13 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
         st["raw_count"] = len(raw)
 
-        # 資料日期：取全部原始資料中最新的有效日期
+        # 取得資料日期
         dd = None
 
         if cfg["date_key"]:
+
             ds = [
-                parse_date(r.get(cfg["date_key"]))
+                parse_date(get_field(r, cfg["date_key"]))
                 for r in raw
             ]
 
@@ -464,8 +544,9 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
         recs = raw
 
-        # 依上市／上櫃公司名單過濾
+        # 公司名單過濾
         if cfg["filt"]:
+
             wl = whitelists.get(
                 cfg["usewl"] or cfg["market"]
             )
@@ -480,9 +561,10 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
         # 保留指定欄位
         if cfg["keep"]:
+
             recs = [
                 {
-                    k: r.get(k)
+                    k: get_field(r, k)
                     for k in cfg["keep"]
                 }
                 for r in recs
@@ -499,8 +581,30 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
                 % (len(recs), cfg["min_rows"])
             )
 
+        # 日期錯誤時輸出實際欄位及範例
         if recs and cfg["date_key"] and not dd:
-            raise ValueError("無法解析資料日期")
+
+            available_keys = (
+                list(raw[0].keys())[:20]
+                if raw else []
+            )
+
+            sample_value = (
+                get_field(raw[0], cfg["date_key"])
+                if raw else None
+            )
+
+            raise ValueError(
+                "無法解析資料日期；"
+                "設定日期欄位=%r；"
+                "實際欄位=%r；"
+                "日期欄位範例值=%r"
+                % (
+                    cfg["date_key"],
+                    available_keys,
+                    sample_value
+                )
+            )
 
         if dd and dd > fetch_date:
             st["warning"] = "資料日期晚於抓取日"
@@ -517,10 +621,12 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
         # 避免舊資料覆蓋新資料
         if dd and old_dd and dd < old_dd:
+
             st["result"] = "stale_skipped"
+
             return st, (old or {}).get("records")
 
-        # 計算資料內容雜湊值
+        # 計算雜湊值
         h = hashlib.sha256(
             json.dumps(
                 recs,
@@ -554,9 +660,11 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         )
 
         if changed:
+
             write_json(latest_path, payload)
 
             if cfg["kind"] == "daily":
+
                 folder = dd or fetch_date
 
                 write_json(
@@ -570,18 +678,19 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
             else "unchanged"
         )
 
-        # 財報首次被本系統看到的日期
+        # 財報首次被系統看到的日期
         if cfg["fs"]:
+
             ck, yk, sk = cfg["fs"]
 
             for r in raw:
-                c, y, s = (
-                    r.get(ck),
-                    r.get(yk),
-                    r.get(sk)
-                )
+
+                c = get_field(r, ck)
+                y = get_field(r, yk)
+                s = get_field(r, sk)
 
                 if c and y and s:
+
                     key = "%s|%s|%s|%s" % (
                         cfg["name"],
                         str(c).strip(),
@@ -595,15 +704,17 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         return st, recs
 
     except Exception as e:
+
         st["result"] = "failed"
         st["error"] = repr(e)
 
-        # 營收與終止上市資料：失敗時優先沿用上次成功資料
+        # 特定資料來源失敗時沿用舊資料
         if cfg["name"] in (
             "twse_revenue",
             "tpex_revenue",
             "twse_delisted"
         ):
+
             old = read_json(latest_path)
 
             if (
@@ -611,6 +722,7 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
                 and isinstance(old.get("records"), list)
                 and old["records"]
             ):
+
                 old_dd = (
                     old.get("meta", {})
                     .get("data_date")
@@ -628,9 +740,9 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
 
                 return st, old["records"]
 
-            # 終止上市資料不是行情計算的必要資料。
-            # 沒有舊資料時標記為暫時無法取得，不使整個流程失敗。
+            # 終止上市資料不是行情計算必要資料
             if cfg["name"] == "twse_delisted":
+
                 st["result"] = "unavailable_optional"
 
                 st["note"] = (
@@ -643,7 +755,12 @@ def process(cfg, whitelists, fetch_date, now_iso, first_seen, fetch):
         return st, None
 
 
+# =========================================================
+# 歷史資料範圍檢查
+# =========================================================
+
 def range_check(name, market, path, key, sample_code, fetch):
+
     url = BASES[market] + path
 
     st = {
@@ -652,21 +769,23 @@ def range_check(name, market, path, key, sample_code, fetch):
     }
 
     try:
+
         raw = [
             r for r in fetch(url)
             if isinstance(r, dict)
         ]
 
         vals = sorted({
-            str(r.get(key))
+            str(get_field(r, key))
             for r in raw
-            if r.get(key)
+            if get_field(r, key)
         })
 
         mine = sorted({
-            str(r.get(key))
+            str(get_field(r, key))
             for r in raw
-            if r.get("Code") == sample_code and r.get(key)
+            if str(get_field(r, "Code")) == sample_code
+            and get_field(r, key)
         })
 
         st.update(
@@ -682,14 +801,21 @@ def range_check(name, market, path, key, sample_code, fetch):
         )
 
     except Exception as e:
+
         st["result"] = "failed"
         st["error"] = repr(e)
 
     return st
 
 
+# =========================================================
+# 主程式
+# =========================================================
+
 def main(fetch=fetch_json):
+
     now = datetime.now(TW)
+
     fetch_date = now.date().isoformat()
 
     first_seen = (
@@ -700,6 +826,7 @@ def main(fetch=fetch_json):
     results = []
 
     for cfg in DATASETS:
+
         st, recs = process(
             cfg,
             whitelists,
@@ -709,16 +836,18 @@ def main(fetch=fetch_json):
             fetch
         )
 
-        # 公司名單抓取失敗時，沿用上次成功名單
+        # 公司名單失敗時沿用舊名單
         if (
             cfg["role"] == "company"
             and st["result"] == "failed"
         ):
+
             old = read_json(
                 "data/latest/%s.json" % cfg["name"]
             )
 
             if old and old.get("records"):
+
                 recs = old["records"]
 
                 st["result"] = "fallback_cached"
@@ -726,9 +855,7 @@ def main(fetch=fetch_json):
                 st["note"] = (
                     "本次抓取失敗，沿用上次成功的名單"
                     "（資料日 %s）"
-                    % (
-                        old.get("meta", {}).get("data_date"),
-                    )
+                    % old.get("meta", {}).get("data_date")
                 )
 
         results.append(st)
@@ -738,18 +865,22 @@ def main(fetch=fetch_json):
             and recs
             and st["result"] != "failed"
         ):
+
             whitelists[
                 cfg["wlkey"] or cfg["market"]
             ] = {
                 code_of(r)
                 for r in recs
+                if code_of(r)
             }
 
         time.sleep(SLEEP)
 
+    # 歷史資料範圍檢查
     ranges = []
 
     for name, market, path, key, code in RANGE_CHECKS:
+
         ranges.append(
             range_check(
                 name,
