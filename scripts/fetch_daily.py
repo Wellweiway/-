@@ -415,10 +415,10 @@ DATASETS = [
         filt=False
     ),
 
-    # 臺灣50指數 CSV
+        # 臺灣50指數 CSV
     D(
         "twse_index_tw50", "twse",
-        "/indicesReport/TAI50I", "daily", "日期",
+        "/indicesReport/TAI50I", "daily", "Date",
         filt=False
     ),
 
