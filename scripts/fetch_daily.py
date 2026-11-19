@@ -59,14 +59,20 @@ def get_field(record, wanted):
     if not isinstance(record, dict):
         return None
 
-    target = normalize_key(wanted)
+    aliases = {
+        "日期": ["日期", "Date"],
+        "Date": ["Date", "日期"],
+    }
 
-    if wanted in record:
-        return record[wanted]
+    candidates = aliases.get(wanted, [wanted])
 
-    for key, value in record.items():
-        if normalize_key(key) == target:
-            return value
+    for candidate in candidates:
+        target = normalize_key(candidate)
+
+        for key, value in record.items():
+            if normalize_key(key) == target:
+                if value is not None and str(value).strip():
+                    return value
 
     return None
 
