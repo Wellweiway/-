@@ -114,7 +114,9 @@
     } catch (e) {
       applying = false;
       console.error("Firebase sync error:", e);
-      say("連線失敗；手機資料沒有被清除。請檢查設定", true);
+      
+say("錯誤：" + (e.code || e.message || String(e)), true);
+
     }
   }
 
